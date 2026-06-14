@@ -119,6 +119,15 @@ Send `#sing [song name]` again and check the logs. The `⚠️ No cookies file f
 - YouTube cookies expire periodically (typically every few weeks to months). If `#sing` starts failing again with the same "Sign in to confirm" error after working for a while, re-export and re-upload `cookies.txt`.
 - This is the standard, widely-recommended workaround for yt-dlp on cloud servers — there's no way to fully avoid it since it's YouTube's anti-scraping measure.
 
+### If you see "Requested format is not available" or "Only images are available"
+
+This means YouTube changed something on their end (this happens often) and the installed yt-dlp version needs updating. Since the Dockerfile downloads yt-dlp once at build time, Render's Docker layer cache may keep serving the old binary on redeploys. To force a fresh download:
+
+1. In Render, go to the **Manual Deploy** dropdown (next to the deploy button).
+2. Choose **"Clear build cache & deploy"**.
+
+This re-runs the Dockerfile from scratch, pulling the latest yt-dlp release.
+
 ### Option C: Other Node hosts (Railway, Fly.io, etc.)
 The same Dockerfile works on any platform that supports Docker deployments — the setup steps are nearly identical to Render.
 

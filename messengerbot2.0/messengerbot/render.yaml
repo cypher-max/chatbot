@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: messenger-music-bot
+    runtime: docker
+    plan: free
+    envVars:
+      - key: PAGE_ACCESS_TOKEN
+        sync: false
+      - key: VERIFY_TOKEN
+        sync: false
+      - key: PORT
+        value: 3000

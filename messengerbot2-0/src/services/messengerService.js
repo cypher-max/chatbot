@@ -1,6 +1,7 @@
 const axios = require('axios');
 const FormData = require('form-data');
 const fs = require('fs');
+const path = require('path');
 
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
 const BASE_URL = 'https://graph.facebook.com/v19.0/me/messages';
@@ -26,6 +27,16 @@ async function sendText(recipientId, text) {
  */
 async function sendAudio(recipientId, audioFilePath) {
   try {
+    const ext = path.extname(audioFilePath).slice(1) || 'mp3';
+    const contentTypeMap = {
+      mp3: 'audio/mpeg',
+      webm: 'audio/webm',
+      m4a: 'audio/mp4',
+      opus: 'audio/ogg',
+      ogg: 'audio/ogg',
+    };
+    const contentType = contentTypeMap[ext] || 'audio/mpeg';
+
     const form = new FormData();
     form.append('recipient', JSON.stringify({ id: recipientId }));
     form.append('message', JSON.stringify({
@@ -35,8 +46,8 @@ async function sendAudio(recipientId, audioFilePath) {
       },
     }));
     form.append('filedata', fs.createReadStream(audioFilePath), {
-      contentType: 'audio/mpeg',
-      filename: 'song.mp3',
+      contentType,
+      filename: `song.${ext}`,
     });
 
     await axios.post(BASE_URL, form, {

@@ -37,11 +37,23 @@ async function handleSing(senderId, songName) {
     console.log(`⬇️  Downloading: ${safeName}`);
     // stdio: 'pipe' captures yt-dlp's real output so errors aren't silently
     // swallowed — execSync throws with stderr attached on non-zero exit.
-    execSync(command, { timeout: 60000, stdio: ['ignore', 'pipe', 'pipe'] });
+    const stdout = execSync(command, { timeout: 60000, stdio: ['ignore', 'pipe', 'pipe'] });
+    console.log('yt-dlp stdout:', stdout.toString().slice(-1000)); // last 1000 chars
 
-    // Find the downloaded file
-    const files = fs.readdirSync(DOWNLOAD_DIR)
-      .filter(f => f.startsWith(senderId) && f.endsWith('.mp3'));
+    // Debug: show everything that landed in the download dir for this sender
+    const allFiles = fs.readdirSync(DOWNLOAD_DIR).filter(f => f.startsWith(senderId));
+    console.log('📂 Files found for sender:', allFiles);
+
+    // Find the downloaded mp3 file
+    let files = allFiles.filter(f => f.endsWith('.mp3'));
+
+    // Fallback: yt-dlp sometimes finishes the download but the mp3
+    // post-processing step only warns (doesn't error), leaving the
+    // original audio file (.webm/.m4a/.opus) instead of .mp3.
+    if (files.length === 0 && allFiles.length > 0) {
+      console.log('⚠️  No .mp3 found, falling back to first available file (post-processing likely failed)');
+      files = allFiles;
+    }
 
     if (files.length === 0) {
       await messenger.sendText(senderId, `❌ Sorry, I couldn't find "${songName}". Try a different name!`);
@@ -53,7 +65,7 @@ async function handleSing(senderId, songName) {
     // Extract song title from filename
     const title = files[0]
       .replace(`${senderId}_`, '')
-      .replace('.mp3', '');
+      .replace(/\.(mp3|webm|m4a|opus)$/, '');
 
     await messenger.sendText(senderId, `🎵 Now playing: *${title}*`);
     await messenger.sendAudio(senderId, audioPath);

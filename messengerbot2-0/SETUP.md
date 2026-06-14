@@ -81,10 +81,43 @@ Render needs ffmpeg and yt-dlp, which aren't part of a normal Node environment, 
 7. Once deployed, Render gives you a permanent URL like `https://messenger-music-bot.onrender.com`. Use `https://messenger-music-bot.onrender.com/webhook` as your Meta webhook callback URL — this URL never changes, unlike ngrok.
 
 > ⚠️ **Important — read before relying on `#sing`:**
-> YouTube actively blocks requests coming from cloud/datacenter IP ranges (AWS, Render, etc.), even with an updated yt-dlp and the Android client workaround. This means `#sing` may work perfectly on your home computer but fail with 403 errors once deployed to Render. If that happens:
-> - There's no permanent fix since this is YouTube vs. scrapers — yt-dlp updates help temporarily but YouTube re-blocks over time.
-> - Workarounds include routing yt-dlp through a residential proxy (paid services exist for this) or using `--cookies-from-browser`/`--cookies cookies.txt` from a logged-in YouTube account, uploaded as a file to your server.
+> YouTube actively blocks requests coming from cloud/datacenter IP ranges (AWS, Render, etc.), even with an updated yt-dlp and the Android client workaround. This means `#sing` may work perfectly on your home computer but fail with `Sign in to confirm you're not a bot` errors once deployed to Render. **This is expected — follow the cookies setup below to fix it.**
 > - `#lyrics`, `#quiz`, `#trivia`, and `#leaderboard` don't depend on yt-dlp and will work normally regardless.
+
+---
+
+## Fixing "Sign in to confirm you're not a bot" (required for Render)
+
+YouTube requires requests from cloud IPs to "prove" they're a real logged-in browser. The fix is to export cookies from your own YouTube session and give them to yt-dlp.
+
+### Step 1 — Export your YouTube cookies
+
+1. Install a cookie-export browser extension:
+   - Chrome: **"Get cookies.txt LOCALLY"** (search the Chrome Web Store)
+   - Firefox: **"cookies.txt"** add-on
+2. Open **youtube.com** in that browser and make sure you're logged in.
+3. Click the extension icon while on youtube.com and export/download `cookies.txt`.
+
+> ⚠️ This file contains your session credentials — treat it like a password. Don't commit it to GitHub or share it publicly. Consider using a secondary/throwaway Google account rather than your main one.
+
+### Step 2 — Add it to Render as a Secret File
+
+1. In your Render service, go to **Environment** → **Secret Files**.
+2. Click **Add Secret File**.
+3. **Filename / path**: `/etc/secrets/cookies.txt`
+4. **Contents**: open your downloaded `cookies.txt` in a text editor, copy everything, and paste it into the Contents box.
+5. Save. Render will redeploy the service automatically.
+
+The bot is already coded to look for this file at `/etc/secrets/cookies.txt` (or wherever the `YT_COOKIES_PATH` env var points, if you set one) — no code changes needed.
+
+### Step 3 — Verify it worked
+
+Send `#sing [song name]` again and check the logs. The `⚠️ No cookies file found` warning should be gone, and the download should succeed.
+
+### Notes
+
+- YouTube cookies expire periodically (typically every few weeks to months). If `#sing` starts failing again with the same "Sign in to confirm" error after working for a while, re-export and re-upload `cookies.txt`.
+- This is the standard, widely-recommended workaround for yt-dlp on cloud servers — there's no way to fully avoid it since it's YouTube's anti-scraping measure.
 
 ### Option C: Other Node hosts (Railway, Fly.io, etc.)
 The same Dockerfile works on any platform that supports Docker deployments — the setup steps are nearly identical to Render.

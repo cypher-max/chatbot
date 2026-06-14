@@ -18,6 +18,12 @@ async function handleSing(senderId, songName) {
   const safeName = songName.replace(/[^a-zA-Z0-9 ]/g, '').trim();
   const outputTemplate = path.join(DOWNLOAD_DIR, `${senderId}_%(title)s.%(ext)s`);
 
+  // Optional cookies file to bypass YouTube's "Sign in to confirm you're not
+  // a bot" check, which frequently triggers on cloud/datacenter IPs (Render,
+  // AWS, etc.). See SETUP.md for how to generate and configure this.
+  const cookiesPath = process.env.YT_COOKIES_PATH || '/etc/secrets/cookies.txt';
+  const hasCookies = fs.existsSync(cookiesPath);
+
   try {
     // yt-dlp must be installed on the server: pip install yt-dlp
     const command = [
@@ -32,7 +38,14 @@ async function handleSing(senderId, songName) {
       // Forces the Android client API, which avoids the 403 Forbidden
       // errors that the default web client frequently hits.
       '--extractor-args "youtube:player_client=android"',
+      // Pass cookies if available, to get past "Sign in to confirm you're
+      // not a bot" errors on cloud server IPs.
+      ...(hasCookies ? [`--cookies "${cookiesPath}"`] : []),
     ].join(' ');
+
+    if (!hasCookies) {
+      console.log('⚠️  No cookies file found at', cookiesPath, '- YouTube may block this request as a bot.');
+    }
 
     console.log(`⬇️  Downloading: ${safeName}`);
     // stdio: 'pipe' captures yt-dlp's real output so errors aren't silently
@@ -87,6 +100,10 @@ async function handleSing(senderId, songName) {
     } else if (stderr.includes('ffmpeg') || stderr.includes('ffprobe')) {
       await messenger.sendText(senderId,
         `⚠️ Server is missing ffmpeg. Please ask the bot operator to install it.`
+      );
+    } else if (stderr.includes('Sign in to confirm')) {
+      await messenger.sendText(senderId,
+        `⚠️ YouTube is blocking song downloads from this server right now. The bot operator needs to add a cookies file — see SETUP.md.`
       );
     } else {
       await messenger.sendText(senderId,

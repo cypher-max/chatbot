@@ -86,47 +86,38 @@ Render needs ffmpeg and yt-dlp, which aren't part of a normal Node environment, 
 
 ---
 
-## Fixing "Sign in to confirm you're not a bot" (required for Render)
+## Avoiding YouTube's bot-detection block (no cookies needed)
 
-YouTube requires requests from cloud IPs to "prove" they're a real logged-in browser. The fix is to export cookies from your own YouTube session and give them to yt-dlp.
+YouTube requires cloud-server requests to prove they're a "real" client. This bot now handles that automatically using a **PO Token Provider** — a small companion server (`bgutil-ytdlp-pot-provider`) that runs inside the same container and generates the proof token yt-dlp needs, with no manual cookie export or rotation required.
 
-### Step 1 — Export your YouTube cookies
+### How it works in this project
 
-1. Install a cookie-export browser extension:
-   - Chrome: **"Get cookies.txt LOCALLY"** (search the Chrome Web Store)
-   - Firefox: **"cookies.txt"** add-on
-2. Open **youtube.com** in that browser and make sure you're logged in.
-3. Click the extension icon while on youtube.com and export/download `cookies.txt`.
+- `Dockerfile` clones and builds the provider server during the Docker build.
+- `start.sh` launches the provider server (port 4416) and the bot together when the container starts.
+- `songService.js` doesn't need any extra configuration — yt-dlp automatically talks to the provider server running on `localhost:4416`.
 
-> ⚠️ This file contains your session credentials — treat it like a password. Don't commit it to GitHub or share it publicly. Consider using a secondary/throwaway Google account rather than your main one.
+You don't need to do anything extra to use this — it's built into the Dockerfile and starts automatically on Render.
 
-### Step 2 — Add it to Render as a Secret File
+### If `#sing` stops working again
 
-1. In your Render service, go to **Environment** → **Secret Files**.
-2. Click **Add Secret File**.
-3. **Filename / path**: `/etc/secrets/cookies.txt`
-4. **Contents**: open your downloaded `cookies.txt` in a text editor, copy everything, and paste it into the Contents box.
-5. Save. Render will redeploy the service automatically.
+PO tokens are reported to last at least a couple of days, which is far better than manual cookies, but YouTube's anti-bot measures evolve constantly, and the provider's own maintainers note it doesn't bypass every block. If `#sing` starts failing again:
 
-The bot is already coded to look for this file at `/etc/secrets/cookies.txt` (or wherever the `YT_COOKIES_PATH` env var points, if you set one) — no code changes needed.
+1. Check Render logs for a line like `🔑 Starting PO Token Provider server on port 4416...` — if this is missing or shows errors, the provider service itself failed to start.
+2. Look for `getpot`/`bgutil`/`ECONNREFUSED` in the yt-dlp error output — this means yt-dlp couldn't reach the provider.
+3. Try a clean rebuild on Render (**Manual Deploy → "Clear build cache & deploy"**) to pick up the latest provider version, since YouTube changes prompt frequent updates from the maintainers.
+4. As a last resort, cookies-based auth (documented below) can be re-enabled by adding a Secret File at `/etc/secrets/cookies.txt` — the code automatically prefers cookies over the PO Token Provider if a valid cookies file is present.
 
-### Step 3 — Verify it worked
+### Fallback: cookies-based auth (optional, not required by default)
 
-Send `#sing [song name]` again and check the logs. The `⚠️ No cookies file found` warning should be gone, and the download should succeed.
+If you ever want to go back to cookies instead, the underlying steps are:
 
-### Notes
+1. Open a private/incognito browser window, log into YouTube (ideally a secondary account).
+2. Navigate to `https://www.youtube.com/robots.txt` in that same window — this avoids the background scripts that rotate cookies and invalidate them within minutes.
+3. Export cookies via a browser extension (e.g. "Get cookies.txt LOCALLY") while on that page.
+4. Close the window immediately and don't reopen it.
+5. Add the file to Render under Environment → Secret Files, path `/etc/secrets/cookies.txt`.
 
-- YouTube cookies expire periodically (typically every few weeks to months). If `#sing` starts failing again with the same "Sign in to confirm" error after working for a while, re-export and re-upload `cookies.txt`.
-- This is the standard, widely-recommended workaround for yt-dlp on cloud servers — there's no way to fully avoid it since it's YouTube's anti-scraping measure.
-
-### If you see "Requested format is not available" or "Only images are available"
-
-This means YouTube changed something on their end (this happens often) and the installed yt-dlp version needs updating. Since the Dockerfile downloads yt-dlp once at build time, Render's Docker layer cache may keep serving the old binary on redeploys. To force a fresh download:
-
-1. In Render, go to the **Manual Deploy** dropdown (next to the deploy button).
-2. Choose **"Clear build cache & deploy"**.
-
-This re-runs the Dockerfile from scratch, pulling the latest yt-dlp release.
+Cookies exported this way still expire periodically and need manual refreshing — this is why the PO Token Provider is the default approach in this project.
 
 ### Option C: Other Node hosts (Railway, Fly.io, etc.)
 The same Dockerfile works on any platform that supports Docker deployments — the setup steps are nearly identical to Render.

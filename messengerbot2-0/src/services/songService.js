@@ -18,11 +18,12 @@ async function handleSing(senderId, songName) {
   const safeName = songName.replace(/[^a-zA-Z0-9 ]/g, '').trim();
   const outputTemplate = path.join(DOWNLOAD_DIR, `${senderId}_%(title)s.%(ext)s`);
 
-  // Optional cookies file to bypass YouTube's "Sign in to confirm you're not
-  // a bot" check, which frequently triggers on cloud/datacenter IPs (Render,
-  // AWS, etc.). See SETUP.md for how to generate and configure this.
-  // Render mounts secret files read-only, but yt-dlp tries to write the
-  // cookie jar back after use, so we copy it to a writable temp path first.
+  // Cookies are now OPTIONAL. By default, this bot uses a local PO Token
+  // Provider server (bgutil-ytdlp-pot-provider, started alongside the bot —
+  // see start.sh / Dockerfile) to bypass YouTube's bot check, instead of a
+  // YouTube cookies file. This avoids the need to manually re-export and
+  // re-upload cookies every time they expire. If a cookies file IS present
+  // (e.g. you added one back for some reason), it still takes priority.
   const cookiesSourcePath = process.env.YT_COOKIES_PATH || '/etc/secrets/cookies.txt';
   const cookiesWritablePath = '/tmp/yt-cookies.txt';
   let hasCookies = false;
@@ -40,12 +41,12 @@ async function handleSing(senderId, songName) {
     // yt-dlp must be installed on the server: pip install yt-dlp
     //
     // Client selection:
-    // - The "android" client avoids the plain 403 errors the default web
-    //   client often hits, but it does NOT support cookies.
-    // - When cookies ARE available, we use the "tv" client instead — it
-    //   accepts cookies and (unlike "web") isn't restricted to image-only
-    //   formats by YouTube's PO token requirement.
-    const clientArg = hasCookies ? 'tv' : 'android';
+    // - The "android" client avoids plain 403 errors but does NOT support
+    //   cookies, and (per yt-dlp docs) has no account cookie support anyway.
+    // - "tv" accepts cookies and isn't restricted to image-only formats.
+    // - When using the PO Token Provider (no cookies), "tv" is also the
+    //   safest choice since it doesn't require a PO token for streaming.
+    const clientArg = hasCookies ? 'tv' : 'tv';
 
     const command = [
       'yt-dlp',
@@ -65,7 +66,7 @@ async function handleSing(senderId, songName) {
     ].join(' ');
 
     if (!hasCookies) {
-      console.log('⚠️  No cookies file found at', cookiesSourcePath, '- YouTube may block this request as a bot.');
+      console.log('ℹ️  No cookies file found — relying on local PO Token Provider for bot-check bypass.');
     }
 
     console.log(`⬇️  Downloading: ${safeName}`);
@@ -124,7 +125,11 @@ async function handleSing(senderId, songName) {
       );
     } else if (stderr.includes('Sign in to confirm')) {
       await messenger.sendText(senderId,
-        `⚠️ YouTube is blocking song downloads from this server right now. The bot operator needs to add a cookies file — see SETUP.md.`
+        `⚠️ YouTube is blocking song downloads from this server right now. The PO Token Provider may be down — check Render logs for the provider service.`
+      );
+    } else if (stderr.includes('getpot') || stderr.includes('bgutil') || stderr.includes('ECONNREFUSED')) {
+      await messenger.sendText(senderId,
+        `⚠️ The PO Token Provider isn't responding. Check that the provider service started correctly — see SETUP.md.`
       );
     } else if (stderr.includes('Requested format is not available') || stderr.includes('Only images are available') || stderr.includes('Signature solving failed') || stderr.includes('n challenge solving failed')) {
       await messenger.sendText(senderId,

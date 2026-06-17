@@ -2,9 +2,9 @@
 FROM node:18-slim
 
 # Install ffmpeg (audio conversion), python3/pip, curl (to fetch yt-dlp),
-# and unzip (required by the Deno installer to extract its own archive)
+# unzip (required by the Deno installer), and git (to clone the PO token provider)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg python3 python3-pip curl unzip && \
+    apt-get install -y --no-install-recommends ffmpeg python3 python3-pip curl unzip git && \
     rm -rf /var/lib/apt/lists/*
 
 # Install yt-dlp (use the official binary install — avoids pip/apt package conflicts)
@@ -19,6 +19,21 @@ RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o 
 ENV DENO_INSTALL=/usr/local
 RUN curl -fsSL https://deno.land/install.sh | sh -s -- -y
 
+# --- PO Token Provider setup (avoids needing a YouTube cookies file) ---
+# YouTube requires a "Proof of Origin" token to confirm requests come from a
+# real client. Without cookies, yt-dlp needs this token from somewhere else —
+# bgutil-ytdlp-pot-provider runs a small local server that generates these
+# tokens automatically, so no manual cookie export/rotation is needed.
+
+# 1. Install the yt-dlp-side plugin that talks to the provider server
+RUN pip3 install --break-system-packages -U bgutil-ytdlp-pot-provider
+
+# 2. Clone and build the provider server itself (Node-based HTTP server)
+RUN git clone --depth 1 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git /opt/bgutil-provider \
+    && cd /opt/bgutil-provider/server \
+    && npm install \
+    && npx tsc
+
 WORKDIR /app
 
 # Install Node dependencies first (better build caching)
@@ -27,6 +42,7 @@ RUN npm install --omit=dev
 
 # Copy the rest of the app
 COPY . .
+RUN chmod +x start.sh
 
 # Create data directories used for temporary song files and leaderboard storage
 RUN mkdir -p data/songs
@@ -34,4 +50,4 @@ RUN mkdir -p data/songs
 ENV PORT=3000
 EXPOSE 3000
 
-CMD ["node", "src/index.js"]
+CMD ["./start.sh"]

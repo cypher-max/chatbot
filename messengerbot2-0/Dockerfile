@@ -1,9 +1,10 @@
 # Use an official Node image based on Debian so we can apt-get extra tools
 FROM node:18-slim
 
-# Install ffmpeg (audio conversion), python3/pip, and curl (to fetch yt-dlp)
+# Install ffmpeg (audio conversion), python3/pip, curl (to fetch yt-dlp),
+# and unzip (required by the Deno installer to extract its own archive)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg python3 python3-pip curl && \
+    apt-get install -y --no-install-recommends ffmpeg python3 python3-pip curl unzip && \
     rm -rf /var/lib/apt/lists/*
 
 # Install yt-dlp (use the official binary install — avoids pip/apt package conflicts)

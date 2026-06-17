@@ -2,9 +2,10 @@
 FROM node:18-slim
 
 # Install ffmpeg (audio conversion), python3/pip, curl (to fetch yt-dlp),
-# unzip (required by the Deno installer), and git (to clone the PO token provider)
+# unzip (required by the Deno installer), git (to clone the PO token provider),
+# and bash (start.sh needs bash-specific features; slim images may lack it)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg python3 python3-pip curl unzip git && \
+    apt-get install -y --no-install-recommends ffmpeg python3 python3-pip curl unzip git bash && \
     rm -rf /var/lib/apt/lists/*
 
 # Install yt-dlp (use the official binary install — avoids pip/apt package conflicts)
@@ -50,4 +51,4 @@ RUN mkdir -p data/songs
 ENV PORT=3000
 EXPOSE 3000
 
-CMD ["./start.sh"]
+CMD ["bash", "start.sh"]

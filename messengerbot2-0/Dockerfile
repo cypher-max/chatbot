@@ -10,6 +10,14 @@ RUN apt-get update && \
 RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
     && chmod a+rx /usr/local/bin/yt-dlp
 
+# Install Deno — yt-dlp uses this as a JS runtime to solve YouTube's
+# signature/"n-parameter" challenges (EJS). Without it, YouTube only serves
+# image-only formats and downloads fail with "Requested format is not available".
+# The standalone yt-dlp binary already bundles the EJS solver scripts, so
+# Deno is the only extra piece needed (per official yt-dlp EJS setup docs).
+ENV DENO_INSTALL=/usr/local
+RUN curl -fsSL https://deno.land/install.sh | sh -s -- -y
+
 WORKDIR /app
 
 # Install Node dependencies first (better build caching)

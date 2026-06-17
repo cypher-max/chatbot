@@ -57,6 +57,10 @@ async function handleSing(senderId, songName) {
       `--output "${outputTemplate}"`,
       '--no-playlist',
       `--extractor-args "youtube:player_client=${clientArg}"`,
+      // Lets yt-dlp pull updated JS-challenge-solver scripts from GitHub if
+      // the version bundled in the binary is outdated (Deno runtime solves
+      // YouTube's signature/n-parameter challenges using these scripts).
+      '--remote-components ejs:github',
       ...(hasCookies ? [`--cookies "${cookiesWritablePath}"`] : []),
     ].join(' ');
 
@@ -122,9 +126,9 @@ async function handleSing(senderId, songName) {
       await messenger.sendText(senderId,
         `⚠️ YouTube is blocking song downloads from this server right now. The bot operator needs to add a cookies file — see SETUP.md.`
       );
-    } else if (stderr.includes('Requested format is not available') || stderr.includes('Only images are available')) {
+    } else if (stderr.includes('Requested format is not available') || stderr.includes('Only images are available') || stderr.includes('Signature solving failed') || stderr.includes('n challenge solving failed')) {
       await messenger.sendText(senderId,
-        `⚠️ YouTube changed something on their end again. The bot operator needs to update yt-dlp — see SETUP.md.`
+        `⚠️ YouTube changed something on their end again. The bot operator needs to check the JS challenge solver (Deno) — see SETUP.md.`
       );
     } else {
       await messenger.sendText(senderId,

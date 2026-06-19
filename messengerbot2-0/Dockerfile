@@ -2,10 +2,9 @@
 FROM node:18-slim
 
 # Install ffmpeg (audio conversion), python3/pip, curl (to fetch yt-dlp),
-# unzip (required by the Deno installer), git (to clone the PO token provider),
-# and bash (start.sh needs bash-specific features; slim images may lack it)
+# unzip (required by the Deno installer), and git (to clone the PO token provider)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg python3 python3-pip curl unzip git bash && \
+    apt-get install -y --no-install-recommends ffmpeg python3 python3-pip curl unzip git && \
     rm -rf /var/lib/apt/lists/*
 
 # Install yt-dlp (use the official binary install — avoids pip/apt package conflicts)
@@ -43,7 +42,6 @@ RUN npm install --omit=dev
 
 # Copy the rest of the app
 COPY . .
-RUN chmod +x start.sh
 
 # Create data directories used for temporary song files and leaderboard storage
 RUN mkdir -p data/songs
@@ -51,4 +49,4 @@ RUN mkdir -p data/songs
 ENV PORT=3000
 EXPOSE 3000
 
-CMD ["bash", "start.sh"]
+CMD ["node", "start.js"]

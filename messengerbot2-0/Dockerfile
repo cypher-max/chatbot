@@ -26,15 +26,31 @@ RUN curl -fsSL https://deno.land/install.sh | sh -s -- -y
 # real client. Without cookies, yt-dlp needs this token from somewhere else —
 # bgutil-ytdlp-pot-provider runs a small local server that generates these
 # tokens automatically, so no manual cookie export/rotation is needed.
+#
+# Since we're using the standalone yt-dlp binary (not pip-installed), the
+# plugin must be installed by placing its release zip into one of yt-dlp's
+# documented SYSTEM plugin directories — `pip install bgutil-ytdlp-pot-provider`
+# only wires itself up for a pip-installed yt-dlp, so it silently does
+# nothing for the binary install, which is what caused #sing to keep hitting
+# "Sign in to confirm you're not a bot" even with the provider running.
+# Docs: https://github.com/yt-dlp/yt-dlp/wiki/Plugins#installing-plugins
 
-# 1. Install the yt-dlp-side plugin that talks to the provider server
-RUN pip3 install --break-system-packages -U bgutil-ytdlp-pot-provider
+# 1. Install the yt-dlp-side plugin into yt-dlp's system plugin directory
+RUN mkdir -p /etc/yt-dlp-plugins \
+    && curl -L https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/latest/download/bgutil-ytdlp-pot-provider.zip \
+       -o /etc/yt-dlp-plugins/bgutil-ytdlp-pot-provider.zip
 
 # 2. Clone and build the provider server itself (Node-based HTTP server)
 RUN git clone --depth 1 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git /opt/bgutil-provider \
     && cd /opt/bgutil-provider/server \
     && npm install \
     && npx tsc
+
+# 3. Verify the plugin is actually detected — fails the build loudly here
+# instead of silently falling back to cookies/bot-detection failures later.
+RUN yt-dlp --version && \
+    yt-dlp -v --simulate "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 2>&1 | grep -i "bgutil" || \
+    (echo "❌ bgutil PO Token plugin was not detected by yt-dlp — check plugin install path" && exit 1)
 
 WORKDIR /app
 

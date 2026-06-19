@@ -81,47 +81,49 @@ Render needs ffmpeg and yt-dlp, which aren't part of a normal Node environment, 
 7. Once deployed, Render gives you a permanent URL like `https://messenger-music-bot.onrender.com`. Use `https://messenger-music-bot.onrender.com/webhook` as your Meta webhook callback URL — this URL never changes, unlike ngrok.
 
 > ⚠️ **Important — read before relying on `#sing`:**
-> YouTube actively blocks requests coming from cloud/datacenter IP ranges (AWS, Render, etc.), even with an updated yt-dlp and the Android client workaround. This means `#sing` may work perfectly on your home computer but fail with `Sign in to confirm you're not a bot` errors once deployed to Render. **This is expected — follow the cookies setup below to fix it.**
+> YouTube actively blocks requests coming from cloud/datacenter IP ranges (AWS, Render, etc.). This means `#sing` may work perfectly on your home computer but fail with `Sign in to confirm you're not a bot` errors once deployed to Render. **This is expected — follow the cookies setup below to fix it.**
 > - `#lyrics`, `#quiz`, `#trivia`, and `#leaderboard` don't depend on yt-dlp and will work normally regardless.
 
 ---
 
-## Avoiding YouTube's bot-detection block (no cookies needed)
+## Fixing "Sign in to confirm you're not a bot" (required for `#sing` on Render)
 
-YouTube requires cloud-server requests to prove they're a "real" client. This bot now handles that automatically using a **PO Token Provider** — a small companion server (`bgutil-ytdlp-pot-provider`) that runs inside the same container and generates the proof token yt-dlp needs, with no manual cookie export or rotation required.
+YouTube requires cloud-server requests to prove they're a real, logged-in browser. Cookies exported from a real YouTube session are currently **the only reliable way to do this** — this project also bundles a PO Token Provider as a secondary signal, but its own maintainers have noted it no longer bypasses this specific check on its own in most cases, so cookies are required.
 
-### How it works in this project
+### Step 1 — Export your YouTube cookies correctly
 
-- `Dockerfile` clones and builds the provider server during the Docker build.
-- `start.sh` launches the provider server (port 4416) and the bot together when the container starts.
-- `songService.js` doesn't need any extra configuration — yt-dlp automatically talks to the provider server running on `localhost:4416`.
+A normal "log in and export" often produces cookies that expire within minutes, because YouTube rotates session tokens in the background of an active tab. To avoid that:
 
-You don't need to do anything extra to use this — it's built into the Dockerfile and starts automatically on Render.
+1. Open a **private/incognito** browser window.
+2. Log into YouTube (using a secondary/throwaway Google account is recommended — treat this file like a password).
+3. In that same private window, navigate to **`https://www.youtube.com/robots.txt`** — literally that URL. This page has no YouTube scripts running, so nothing rotates your session while you export.
+4. While still on that page, use a cookie-export extension (Chrome: "Get cookies.txt LOCALLY"; Firefox: "cookies.txt") to download `cookies.txt`.
+5. Close that private window immediately and don't reopen it or browse YouTube in it again.
 
-### If `#sing` stops working again
+### Step 2 — Add it to Render as a Secret File
 
-PO tokens are reported to last at least a couple of days, which is far better than manual cookies, but YouTube's anti-bot measures evolve constantly, and the provider's own maintainers note it doesn't bypass every block. If `#sing` starts failing again:
+1. In your Render service, go to **Environment** → **Secret Files**.
+2. Click **Add Secret File**.
+3. **Filename / path**: `/etc/secrets/cookies.txt`
+4. **Contents**: paste the full contents of your downloaded `cookies.txt`.
+5. Save — Render redeploys automatically.
 
-1. Check Render logs for a line like `🔑 Starting PO Token Provider server on port 4416...` — if this is missing or shows errors, the provider service itself failed to start.
-2. Look for `getpot`/`bgutil`/`ECONNREFUSED` in the yt-dlp error output — this means yt-dlp couldn't reach the provider.
-3. Try a clean rebuild on Render (**Manual Deploy → "Clear build cache & deploy"**) to pick up the latest provider version, since YouTube changes prompt frequent updates from the maintainers.
-4. As a last resort, cookies-based auth (documented below) can be re-enabled by adding a Secret File at `/etc/secrets/cookies.txt` — the code automatically prefers cookies over the PO Token Provider if a valid cookies file is present.
+The code automatically looks for this file and uses it — no further changes needed.
 
-### Fallback: cookies-based auth (optional, not required by default)
+### Step 3 — Verify it worked
 
-If you ever want to go back to cookies instead, the underlying steps are:
+Send `#sing [song name]` and check the logs. You should NOT see the `⚠️ No cookies file found` warning, and the download should succeed.
 
-1. Open a private/incognito browser window, log into YouTube (ideally a secondary account).
-2. Navigate to `https://www.youtube.com/robots.txt` in that same window — this avoids the background scripts that rotate cookies and invalidate them within minutes.
-3. Export cookies via a browser extension (e.g. "Get cookies.txt LOCALLY") while on that page.
-4. Close the window immediately and don't reopen it.
-5. Add the file to Render under Environment → Secret Files, path `/etc/secrets/cookies.txt`.
+### When cookies eventually expire
 
-Cookies exported this way still expire periodically and need manual refreshing — this is why the PO Token Provider is the default approach in this project.
+Even exported correctly, cookies don't last forever — expect them to need refreshing every so often (this varies; could be days to weeks). When `#sing` starts failing again with `Sign in to confirm` or `cookies are no longer valid`, just repeat Steps 1–2 with a fresh export.
 
-### Option C: Other Node hosts (Railway, Fly.io, etc.)
-The same Dockerfile works on any platform that supports Docker deployments — the setup steps are nearly identical to Render.
+### About the bundled PO Token Provider
 
+This project still runs a PO Token Provider (`bgutil-ytdlp-pot-provider`) alongside the bot as a secondary signal — it doesn't hurt to have it running, and it may help in some cases, but **don't rely on it alone**. Its own README currently states that passing PO tokens no longer reliably bypasses YouTube's bot check by itself. Cookies are the dependable method.
+
+### Other Node hosts (Railway, Fly.io, etc.)
+The same Dockerfile works on any platform that supports Docker deployments — the setup steps are nearly identical to Render. Secret file mechanisms differ slightly by platform; check their docs for the equivalent of Render's "Secret Files."
 
 ---
 

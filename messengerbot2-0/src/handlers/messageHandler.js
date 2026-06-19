@@ -23,9 +23,9 @@ async function handleMessage(event) {
     await messenger.sendText(senderId, `📜 Fetching lyrics for "${songName}"...`);
     await lyricsService.handleLyrics(senderId, songName);
 
-  // #quiz [optional topic]
+  // #quiz [optional topic] — random topic if none given
   } else if (text.toLowerCase().startsWith('#quiz')) {
-    const topic = text.slice(5).trim() || 'music';
+    const topic = text.slice(5).trim(); // empty string if none given
     await quizService.startQuiz(senderId, topic);
 
   // #answer [A/B/C/D] — answer a quiz question
@@ -33,9 +33,10 @@ async function handleMessage(event) {
     const answer = text.slice(8).trim().toUpperCase();
     await quizService.handleAnswer(senderId, answer);
 
-  // #trivia
-  } else if (text.toLowerCase() === '#trivia') {
-    await triviaService.sendTrivia(senderId);
+  // #trivia [optional topic] — random topic if none given
+  } else if (text.toLowerCase().startsWith('#trivia')) {
+    const topic = text.slice(7).trim(); // empty string if none given
+    await triviaService.sendTrivia(senderId, topic);
 
   // #leaderboard
   } else if (text.toLowerCase() === '#leaderboard') {
@@ -59,11 +60,11 @@ async function sendHelp(senderId) {
     `🎶 *MusicBot Commands*\n\n` +
     `🎵 *#sing [song name]*\n   Sends a song as a voice message\n\n` +
     `📜 *#lyrics [song name]*\n   Get the full lyrics\n\n` +
-    `🧠 *#quiz [topic]*\n   Start a music quiz (topic optional)\n\n` +
+    `🧠 *#quiz [topic]*\n   Start a quiz — any topic, or random if left blank\n\n` +
     `✅ *#answer [A/B/C/D]*\n   Answer the current quiz question\n\n` +
-    `🎲 *#trivia*\n   Get a random music trivia fact\n\n` +
+    `🎲 *#trivia [topic]*\n   Get a fact — any topic, or random if left blank\n\n` +
     `🏆 *#leaderboard*\n   See the top quiz scorers\n\n` +
-    `💡 Examples:\n   #sing Bohemian Rhapsody\n   #lyrics Blinding Lights\n   #quiz Beatles`;
+    `💡 Examples:\n   #sing Bohemian Rhapsody\n   #lyrics Blinding Lights\n   #quiz space exploration\n   #trivia (random topic)`;
   await messenger.sendText(senderId, helpText);
 }
 

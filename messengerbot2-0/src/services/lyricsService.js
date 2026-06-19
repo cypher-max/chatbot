@@ -77,10 +77,26 @@ Do not add any explanation, just the lyrics or NOT_FOUND.`
         }]
       })
     });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error(`❌ Claude lyrics fallback — API responded ${res.status}: ${errBody}`);
+      return null;
+    }
+
     const data = await res.json();
+
+    if (data.error) {
+      console.error(`❌ Claude lyrics fallback — API error: ${data.error.type} - ${data.error.message}`);
+      return null;
+    }
+
     const text = data.content?.[0]?.text?.trim();
     return (text && text !== 'NOT_FOUND') ? text : null;
-  } catch {
+  } catch (err) {
+    // Previously this was a silent empty catch — now logged so failures
+    // are actually diagnosable in Render logs.
+    console.error('❌ Claude lyrics fallback error:', err.message);
     return null;
   }
 }

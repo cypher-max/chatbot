@@ -1,5 +1,7 @@
-# Use an official Node image based on Debian so we can apt-get extra tools
-FROM node:18-slim
+# Use an official Node image based on Debian so we can apt-get extra tools.
+# Node 20+ is required — the PO Token Provider's dependencies (jsdom and its
+# sub-dependencies) ship as ES Modules that fail under Node 18's require().
+FROM node:20-slim
 
 # Install ffmpeg (audio conversion), python3/pip, curl (to fetch yt-dlp),
 # unzip (required by the Deno installer), and git (to clone the PO token provider)

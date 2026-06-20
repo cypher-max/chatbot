@@ -53,8 +53,14 @@ Edit `.env`:
 ```
 PAGE_ACCESS_TOKEN=EAAxxxxxxxxxxxxxxx   # From Meta Developer Console
 VERIFY_TOKEN=my_messenger_bot_token    # Must match what you entered in Meta
+GEMINI_API_KEY=AIzaxxxxxxxxxxx         # From aistudio.google.com/apikey — required for #quiz, #trivia, lyrics fallback
 PORT=3000
 ```
+
+> **Getting a Gemini API key (free, no credit card):** Go to **https://aistudio.google.com/apikey**, sign in with a Google account, and click **Create API key**. The free tier covers roughly 1,500 requests/day on Gemini 2.5 Flash — far more than a personal bot needs. Without this key, `#quiz`, `#trivia`, and the AI lyrics fallback will not work, though `#sing` and the lyrics.ovh lookup will still function normally.
+>
+> ⚠️ **Important:** as of June 19, 2026, Google rejects requests from "unrestricted" API keys. After creating your key in AI Studio, find it in the API Keys list, click the **Unrestricted** label, choose **Add restrictions → Restrict to Gemini API only**, and confirm. Skipping this step will cause every `#quiz`/`#trivia`/lyrics request to fail.
+
 
 ---
 
@@ -77,6 +83,7 @@ Render needs ffmpeg and yt-dlp, which aren't part of a normal Node environment, 
 5. Under **Environment**, add:
    - `PAGE_ACCESS_TOKEN` = your token from Meta
    - `VERIFY_TOKEN` = the value you'll enter in the Meta webhook setup
+   - `GEMINI_API_KEY` = your restricted key from aistudio.google.com/apikey (required for #quiz, #trivia, lyrics fallback)
 6. Click **Create Web Service**. The first build takes a few minutes (installing ffmpeg + yt-dlp).
 7. Once deployed, Render gives you a permanent URL like `https://messenger-music-bot.onrender.com`. Use `https://messenger-music-bot.onrender.com/webhook` as your Meta webhook callback URL — this URL never changes, unlike ngrok.
 
@@ -150,10 +157,11 @@ messengerbot/
 │   │   └── messageHandler.js       # Routes #commands to services
 │   └── services/
 │       ├── messengerService.js     # Facebook API calls
+│       ├── geminiService.js        # Shared Gemini API helper (free tier)
 │       ├── songService.js          # #sing — yt-dlp download + audio send
-│       ├── lyricsService.js        # #lyrics — lyrics.ovh + Claude fallback
+│       ├── lyricsService.js        # #lyrics — lyrics.ovh + Gemini fallback
 │       ├── quizService.js          # #quiz / #answer — AI-generated Q&A
-│       ├── triviaService.js        # #trivia — random music facts
+│       ├── triviaService.js        # #trivia — random facts, any topic
 │       └── leaderboardService.js   # #leaderboard — JSON file storage
 ├── data/
 │   ├── songs/                      # Temporary downloaded audio files

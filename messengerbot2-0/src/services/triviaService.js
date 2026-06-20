@@ -1,4 +1,5 @@
 const messenger = require('./messengerService');
+const { callGemini } = require('./geminiService');
 
 // Broad, varied default topics — used when the user doesn't specify one.
 // Not limited to music anymore.
@@ -33,34 +34,11 @@ async function sendTrivia(senderId, topic) {
   await messenger.sendText(senderId, `🎲 Getting a trivia fact about *${chosenTopic}*...`);
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        messages: [{
-          role: 'user',
-          content: `Give me one fascinating and surprising trivia fact about: ${chosenTopic}.
+    const fact = await callGemini(
+      `Give me one fascinating and surprising trivia fact about: ${chosenTopic}.
 Make it engaging and fun. Keep it to 2-3 sentences max.
 Start with an emoji that fits the fact. Do not use markdown headers.`
-        }]
-      })
-    });
-
-    if (!res.ok) {
-      const errBody = await res.text();
-      throw new Error(`API responded ${res.status}: ${errBody}`);
-    }
-
-    const data = await res.json();
-
-    if (data.error) {
-      throw new Error(`API error: ${data.error.type} - ${data.error.message}`);
-    }
-
-    const fact = data.content?.[0]?.text?.trim();
-    if (!fact) throw new Error('Empty response from API: ' + JSON.stringify(data));
+    );
 
     await messenger.sendText(senderId,
       `🎲 *Trivia: ${chosenTopic}*\n\n${fact}\n\n💬 Want more? Type *#trivia* for a random topic, or *#trivia [topic]* for something specific!\n🧠 Ready to test yourself? Type *#quiz [topic]*`

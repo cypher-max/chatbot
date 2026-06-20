@@ -1,5 +1,6 @@
 const axios = require('axios');
 const messenger = require('./messengerService');
+const { callGemini } = require('./geminiService');
 
 /**
  * Handle #lyrics [song name]
@@ -62,41 +63,15 @@ async function handleLyrics(senderId, songName) {
 
 async function getLyricsFromClaude(songName) {
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        messages: [{
-          role: 'user',
-          content: `Provide the first two verses and chorus of the song "${songName}". 
+    const text = await callGemini(
+      `Provide the first two verses and chorus of the song "${songName}". 
 If you know this song, provide the actual lyrics excerpt. 
 If you don't know it or it's not a real song, respond with exactly: NOT_FOUND
 Do not add any explanation, just the lyrics or NOT_FOUND.`
-        }]
-      })
-    });
-
-    if (!res.ok) {
-      const errBody = await res.text();
-      console.error(`❌ Claude lyrics fallback — API responded ${res.status}: ${errBody}`);
-      return null;
-    }
-
-    const data = await res.json();
-
-    if (data.error) {
-      console.error(`❌ Claude lyrics fallback — API error: ${data.error.type} - ${data.error.message}`);
-      return null;
-    }
-
-    const text = data.content?.[0]?.text?.trim();
+    );
     return (text && text !== 'NOT_FOUND') ? text : null;
   } catch (err) {
-    // Previously this was a silent empty catch — now logged so failures
-    // are actually diagnosable in Render logs.
-    console.error('❌ Claude lyrics fallback error:', err.message);
+    console.error('❌ Lyrics AI fallback error:', err.message);
     return null;
   }
 }

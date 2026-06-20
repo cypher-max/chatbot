@@ -1,5 +1,6 @@
 const messenger = require('./messengerService');
 const leaderboard = require('./leaderboardService');
+const { callGemini } = require('./geminiService');
 
 // In-memory quiz sessions: { senderId: { question, answer, topic, score, round } }
 const sessions = {};
@@ -56,15 +57,8 @@ async function sendQuestion(senderId) {
   await messenger.sendText(senderId, `⏳ Generating question ${session.round}/5...`);
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        messages: [{
-          role: 'user',
-          content: `Generate a trivia question about "${session.topic}".
+    const raw = await callGemini(
+      `Generate a trivia question about "${session.topic}".
 Respond ONLY with valid JSON, no markdown, no explanation:
 {
   "question": "The question text",
@@ -72,23 +66,7 @@ Respond ONLY with valid JSON, no markdown, no explanation:
   "answer": "A",
   "fact": "Interesting fact about the answer (1 sentence)"
 }`
-        }]
-      })
-    });
-
-    if (!res.ok) {
-      const errBody = await res.text();
-      throw new Error(`API responded ${res.status}: ${errBody}`);
-    }
-
-    const data = await res.json();
-
-    if (data.error) {
-      throw new Error(`API error: ${data.error.type} - ${data.error.message}`);
-    }
-
-    const raw = data.content?.[0]?.text?.trim() || '';
-    if (!raw) throw new Error('Empty response from API: ' + JSON.stringify(data));
+    );
 
     const clean = raw.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(clean);
